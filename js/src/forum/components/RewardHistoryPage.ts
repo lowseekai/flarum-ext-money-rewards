@@ -19,7 +19,7 @@ export default class RewardHistoryPage extends UserPage {
     show(user: any) {
         super.show(user);
 
-        app.setTitle(extractText(app.translator.trans('clarkwinkelmann-money-rewards.forum.profile.title')));
+        app.setTitle(extractText(app.translator.trans('lowseekai-money-rewards.forum.profile.title')));
 
         this.loadRewards();
     }

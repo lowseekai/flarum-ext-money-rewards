@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $post_id
  * @property int $giver_user_id
  * @property int $receiver_user_id
- * @property float $amount
+ * @property int $amount
  * @property bool $new_money
  * @property string $comment
  * @property Carbon $created_at
@@ -28,6 +28,11 @@ class Reward extends AbstractModel
     protected $dates = [
         'created_at',
         'updated_at',
+    ];
+
+    protected $casts = [
+        'amount' => 'integer',
+        'new_money' => 'boolean',
     ];
 
     public function post(): BelongsTo

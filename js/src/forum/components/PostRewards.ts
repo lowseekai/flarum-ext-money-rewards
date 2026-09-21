@@ -18,7 +18,7 @@ export default class PostRewards extends Component<PostRewardsAttrs> {
         }
 
         return m('.PostMoneyRewards', [
-            m('h4', app.translator.trans('clarkwinkelmann-money-rewards.forum.post.section')),
+            m('h4', app.translator.trans('lowseekai-money-rewards.forum.post.section')),
             m('ul.MoneyRewardRecords', rewards.map(reward => RewardRecord.component({reward}))),
         ]);
     }

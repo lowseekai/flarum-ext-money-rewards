@@ -2,63 +2,46 @@
 
 namespace ClarkWinkelmann\MoneyRewards\Controllers;
 
-use AntoineFr\Money\Event\MoneyUpdated;
 use ClarkWinkelmann\MoneyRewards\Reward;
-use Flarum\Api\Controller\AbstractCreateController;
-use Flarum\Api\Serializer\PostSerializer;
 use Flarum\Foundation\ValidationException;
 use Flarum\Http\RequestUtil;
-use Flarum\Locale\Translator;
+use Flarum\Locale\TranslatorInterface;
 use Flarum\Post\PostRepository;
 use Flarum\Settings\SettingsRepositoryInterface;
-use Flarum\User\User;
-use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Validation\Factory;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Arr;
+use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use Psr\Log\LoggerInterface;
-use Tobscure\JsonApi\Document;
+use Ramon\PointSystem\Repository\PointsRepository;
 
-class CreateRewardController extends AbstractCreateController
+class CreateRewardController extends AbstractJsonApiController
 {
-    // We return the post with moneyRewards relation so that the UI updates with the new reward
-    public $serializer = PostSerializer::class;
-
-    public $include = [
-        // We include giver because it's listed under the post and also to update the actor's balance in the UI
-        'moneyRewards.giver',
-        'moneyRewards.fullGiver',
-        // Receiver is not shown under the post, but this will update their balance in the user card
-        'moneyRewards.fullReceiver',
-    ];
-
-    protected $settings;
-    protected $events;
-    protected $repository;
-    protected $validation;
-    protected $translator;
-
-    public function __construct(SettingsRepositoryInterface $settings, Dispatcher $events, PostRepository $repository, Factory $validation, Translator $translator)
-    {
-        $this->settings = $settings;
-        $this->events = $events;
-        $this->repository = $repository;
-        $this->validation = $validation;
-        $this->translator = $translator;
+    public function __construct(
+        protected SettingsRepositoryInterface $settings,
+        protected PostRepository $posts,
+        protected Factory $validation,
+        protected TranslatorInterface $translator,
+        protected PointsRepository $points,
+        protected ConnectionInterface $db,
+    ) {
     }
 
-    protected function data(ServerRequestInterface $request, Document $document)
+    public function handle(ServerRequestInterface $request): ResponseInterface
     {
-        $attributes = (array)Arr::get($request->getParsedBody(), 'data.attributes');
-
         $actor = RequestUtil::getActor($request);
+        $actor->assertRegistered();
 
-        $post = $this->repository->findOrFail(Arr::get($request->getQueryParams(), 'id'), $actor);
-
+        $post = $this->posts->findOrFail(
+            (int) Arr::get($request->getQueryParams(), 'id'),
+            $actor
+        );
         $actor->assertCan('rewardWithMoney', $post);
 
-        $amount = floatval(Arr::get($attributes, 'amount'));
-        $comment = (string)Arr::get($attributes, 'comment');
+        $attributes = (array) Arr::get($request->getParsedBody(), 'data.attributes', []);
+        $amount = $this->amount(Arr::get($attributes, 'amount'));
+        $comment = trim((string) Arr::get($attributes, 'comment', ''));
+        $createMoney = filter_var(Arr::get($attributes, 'createMoney', false), FILTER_VALIDATE_BOOLEAN);
 
         $this->validation->make([
             'comment' => $comment,
@@ -68,35 +51,31 @@ class CreateRewardController extends AbstractCreateController
 
         $this->validateAmount($amount, $actor);
 
-        $actorMoneyUpdated = false;
-        $recipientMoneyUpdated = false;
-        $reward = null;
-
-        $createMoney = (bool)Arr::get($attributes, 'createMoney');
+        if (! (bool) $this->settings->get('point-system.enabled', true)) {
+            throw new ValidationException([
+                'amount' => $this->translator->trans('lowseekai-money-rewards.api.error.systemDisabled'),
+            ]);
+        }
 
         if ($createMoney) {
             $actor->assertCan('money-rewards.createMoney');
-        } else {
-            if ($actor->money < $amount) {
-                throw new ValidationException([
-                    'amount' => $this->translator->trans('clarkwinkelmann-money-rewards.api.error.notEnoughFunds'),
-                ]);
-            }
         }
 
-        try {
-            if (!$createMoney) {
-                $actor->money -= $amount;
-                $actor->save();
-                $actorMoneyUpdated = true;
-            }
+        $recipient = $post->user;
+        if (! $recipient || $recipient->id === $actor->id) {
+            throw new ValidationException([
+                'post' => $this->translator->trans('lowseekai-money-rewards.api.error.invalidRecipient'),
+            ]);
+        }
 
-            $recipient = $post->user;
-
-            $recipient->money += $amount;
-            $recipient->save();
-            $recipientMoneyUpdated = true;
-
+        $this->db->transaction(function () use (
+            $post,
+            $actor,
+            $recipient,
+            $amount,
+            $comment,
+            $createMoney
+        ): void {
             $reward = new Reward();
             $reward->post()->associate($post);
             $reward->giver()->associate($actor);
@@ -105,83 +84,117 @@ class CreateRewardController extends AbstractCreateController
             $reward->new_money = $createMoney;
             $reward->comment = $comment;
             $reward->save();
-        } catch (\Exception $exception) {
-            $log = resolve(LoggerInterface::class);
 
-            $log->error(
-                '[money-rewards] An error occurred while processing the reward. Some of the money might not have been attributed' . PHP_EOL .
-                ' | Amount: ' . $amount . PHP_EOL .
-                ' | Create money: ' . ($createMoney ? 'yes' : 'no') . PHP_EOL .
-                ' | Actor (#' . $actor->id . ') money updated: ' . ($actorMoneyUpdated ? 'yes' : 'no') . PHP_EOL .
-                ' | Recipient (' . ($recipient ? '#' . $recipient->id : 'N/A') . ') money updated: ' . ($recipientMoneyUpdated ? 'yes' : 'no') . PHP_EOL .
-                ' | History entry: ' . ($reward ? 'created, #' . $reward->id : 'not created'),
+            if (! $createMoney) {
+                try {
+                    $this->points->deduct(
+                        $actor,
+                        $amount,
+                        'money_reward.sent',
+                        'money_reward',
+                        $reward->id
+                    );
+                } catch (\DomainException $exception) {
+                    throw new ValidationException([
+                        'amount' => $this->translator->trans('lowseekai-money-rewards.api.error.notEnoughFunds'),
+                    ]);
+                }
+            }
+
+            $this->points->award(
+                $recipient,
+                $amount,
+                $createMoney ? 'money_reward.created' : 'money_reward.received',
+                'money_reward',
+                $reward->id
             );
+        });
 
-            throw $exception;
+        $post->load([
+            'moneyRewards.giver',
+            'moneyRewards.receiver',
+        ]);
+
+        $included = [];
+        foreach ($post->moneyRewards as $postReward) {
+            $this->addIncluded($included, $this->rewardResource($postReward));
+
+            if ($postReward->giver) {
+                $this->addIncluded(
+                    $included,
+                    $this->userResource(
+                        $postReward->giver,
+                        $postReward->giver->id === $actor->id
+                            ? $this->points->getOrCreate($actor)->balance
+                            : null
+                    )
+                );
+            }
+
+            if ($postReward->receiver) {
+                $this->addIncluded(
+                    $included,
+                    $this->userResource(
+                        $postReward->receiver,
+                        $postReward->receiver->id === $recipient->id
+                            ? $this->points->getOrCreate($recipient)->balance
+                            : null
+                    )
+                );
+            }
         }
 
-        if ($actorMoneyUpdated) {
-            $this->events->dispatch(new MoneyUpdated($actor));
-        }
-        $this->events->dispatch(new MoneyUpdated($recipient));
-
-        return $post;
+        return $this->response([$this->postResource($post)], $included);
     }
 
-    protected function validateAmount(float $amount, User $actor)
+    protected function amount(mixed $value): int
     {
-        $preselection = $this->settings->get('money-rewards.preselection');
-        $preselectionException = null;
+        $value = trim((string) $value);
 
-        if ($preselection) {
-            try {
-                $this->validation->make([
-                    'amount' => $amount,
-                ], [
-                    'amount' => 'required|numeric|in:' . $preselection,
-                ])->validate();
-
-                // No need to validate custom amounts if it matched one of the preselections
-                return;
-            } catch (\Exception $exception) {
-                $preselectionException = $exception;
-            }
+        if ($value === '' || ! preg_match('/^[1-9][0-9]*$/', $value)) {
+            throw new ValidationException([
+                'amount' => $this->translator->trans('lowseekai-money-rewards.api.error.invalidAmount'),
+            ]);
         }
 
-        if ($actor->hasPermission('money-rewards.customAmounts')) {
-            $validationRules = [
-                'required',
-                'numeric',
-                'min:' . (max(0, (int)$this->settings->get('money-rewards.min'))),
-                function ($attribute, $value, $fail) {
-                    $maxDecimals = max(0, (int)$this->settings->get('money-rewards.decimals'));
-                    // https://stackoverflow.com/a/60638478
-                    $decimalsCount = (int)strpos(strrev((string)$value), '.');
+        return min((int) $value, 1000000000);
+    }
 
-                    if ($decimalsCount > $maxDecimals) {
-                        $fail($this->translator->trans('clarkwinkelmann-money-rewards.api.error.decimals', [
-                            '{decimals}' => $maxDecimals,
-                        ]));
-                    }
-                },
-            ];
-
-            if ($max = $this->settings->get('money-rewards.max')) {
-                $validationRules[] = "max:$max";
-            }
-
-            $this->validation->make([
-                'amount' => $amount,
-            ], [
-                'amount' => $validationRules,
-            ])->validate();
-
+    protected function validateAmount(int $amount, \Flarum\User\User $actor): void
+    {
+        if (in_array($amount, $this->preselection(), true)) {
             return;
         }
 
-        // Only throw preselection exception if custom amounts were not processed
-        if ($preselectionException) {
-            throw $preselectionException;
+        if (! $actor->hasPermission('money-rewards.customAmounts')) {
+            throw new ValidationException([
+                'amount' => $this->translator->trans('lowseekai-money-rewards.api.error.invalidAmount'),
+            ]);
         }
+
+        $rules = [
+            'required',
+            'integer',
+            'min:' . max(1, (int) $this->settings->get('money-rewards.min', 1)),
+        ];
+
+        if (($max = (int) $this->settings->get('money-rewards.max', 0)) > 0) {
+            $rules[] = 'max:' . $max;
+        }
+
+        $this->validation->make(['amount' => $amount], ['amount' => $rules])->validate();
+    }
+
+    /**
+     * @return int[]
+     */
+    protected function preselection(): array
+    {
+        return collect(explode(',', (string) $this->settings->get('money-rewards.preselection', '')))
+            ->map(static fn (string $value): int => (int) trim($value))
+            ->filter(static fn (int $value): bool => $value > 0)
+            ->unique()
+            ->values()
+            ->all();
     }
 }

@@ -3,43 +3,68 @@
 namespace ClarkWinkelmann\MoneyRewards\Controllers;
 
 use ClarkWinkelmann\MoneyRewards\Reward;
-use ClarkWinkelmann\MoneyRewards\RewardSerializer;
-use Flarum\Api\Controller\AbstractListController;
 use Flarum\Http\RequestUtil;
 use Flarum\User\UserRepository;
 use Illuminate\Support\Arr;
+use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use Tobscure\JsonApi\Document;
 
-class ListUserRewardController extends AbstractListController
+class ListUserRewardController extends AbstractJsonApiController
 {
-    public $serializer = RewardSerializer::class;
-
-    public $include = [
-        'post.discussion',
-        'giver',
-        'receiver',
-    ];
-
-    protected $repository;
-
-    public function __construct(UserRepository $repository)
-    {
-        $this->repository = $repository;
+    public function __construct(
+        protected UserRepository $users
+    ) {
     }
 
-    protected function data(ServerRequestInterface $request, Document $document)
+    public function handle(ServerRequestInterface $request): ResponseInterface
     {
         $actor = RequestUtil::getActor($request);
-
-        $user = $this->repository->findOrFail(Arr::get($request->getQueryParams(), 'id'), $actor);
+        $user = $this->users->findOrFail(
+            (int) Arr::get($request->getQueryParams(), 'id'),
+            $actor
+        );
 
         $actor->assertCan('seeMoneyRewardHistory', $user);
 
-        return Reward::query()
-            ->where('giver_user_id', $user->id)
-            ->orWhere('receiver_user_id', $user->id)
-            ->orderBy('created_at', 'desc')
+        $rewards = Reward::query()
+            ->where(function ($query) use ($user) {
+                $query
+                    ->where('giver_user_id', $user->id)
+                    ->orWhere('receiver_user_id', $user->id);
+            })
+            ->with([
+                'post.discussion',
+                'post.user',
+                'giver',
+                'receiver',
+            ])
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->get();
+
+        $included = [];
+        $data = [];
+
+        foreach ($rewards as $reward) {
+            $data[] = $this->rewardResource($reward);
+
+            if ($reward->giver) {
+                $this->addIncluded($included, $this->userResource($reward->giver));
+            }
+
+            if ($reward->receiver) {
+                $this->addIncluded($included, $this->userResource($reward->receiver));
+            }
+
+            if ($reward->post) {
+                $this->addIncluded($included, $this->postResource($reward->post));
+
+                if ($reward->post->discussion) {
+                    $this->addIncluded($included, $this->discussionResource($reward->post->discussion));
+                }
+            }
+        }
+
+        return $this->response($data, $included);
     }
 }

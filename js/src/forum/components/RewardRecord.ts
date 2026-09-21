@@ -1,9 +1,9 @@
 import app from 'flarum/forum/app';
 import Component, {ComponentAttrs} from 'flarum/common/Component';
+import Avatar from 'flarum/common/components/Avatar';
+import Icon from 'flarum/common/components/Icon';
 import Link from 'flarum/common/components/Link';
-import avatar from 'flarum/common/helpers/avatar';
 import humanTime from 'flarum/common/helpers/humanTime';
-import icon from 'flarum/common/helpers/icon';
 import username from 'flarum/common/helpers/username';
 import Reward from '../models/Reward';
 import FormattedMoney from './FormattedMoney';
@@ -22,26 +22,26 @@ export default class RewardRecord extends Component<RewardRecordAttrs> {
         const post = reward.post();
 
         const giverContent = [
-            avatar(giver),
+            Avatar.component({user: giver}),
             username(giver),
         ];
 
         const receiverContent = [
-            avatar(receiver),
+            Avatar.component({user: receiver}),
             username(receiver),
         ];
 
         const comment = reward.comment();
 
         return m('li.MoneyRewardRecord', [
-            m('span.MoneyRewardRecordIcon', icon('fas fa-gift')),
+            m('span.MoneyRewardRecordIcon', Icon.component({name: 'fas fa-gift'})),
             m('span.MoneyRewardRecordDate', humanTime(reward.createdAt()!)),
             m('span.MoneyRewardRecordAmount', FormattedMoney.component({
                 money: reward.amount(),
             })),
             m('span.MoneyRewardRecordGiver', [
                 ' ',
-                app.translator.trans('clarkwinkelmann-money-rewards.forum.record.from'),
+                app.translator.trans('lowseekai-money-rewards.forum.record.from'),
                 ' ',
                 giver ? Link.component({
                     className: 'MoneyRewardRecordUser',
@@ -50,7 +50,7 @@ export default class RewardRecord extends Component<RewardRecordAttrs> {
             ]),
             showReceiver ? m('span.MoneyRewardRecordReceiver', [
                 ' ',
-                app.translator.trans('clarkwinkelmann-money-rewards.forum.record.to'),
+                app.translator.trans('lowseekai-money-rewards.forum.record.to'),
                 ' ',
                 receiver ? Link.component({
                     className: 'MoneyRewardRecordUser',
@@ -59,7 +59,7 @@ export default class RewardRecord extends Component<RewardRecordAttrs> {
             ]) : null,
             showReceiver && post ? m('span.MoneyRewardRecordPost', [
                 ' ',
-                app.translator.trans('clarkwinkelmann-money-rewards.forum.record.post', {
+                app.translator.trans('lowseekai-money-rewards.forum.record.post', {
                     number: post.number(),
                     title: post.discussion()?.title() || 'N/A',
                     a: Link.component({
@@ -68,7 +68,7 @@ export default class RewardRecord extends Component<RewardRecordAttrs> {
                 }),
             ]) : null,
             comment ? m('.MoneyRewardRecordComment', [
-                m('span.MoneyRewardRecordCommentLabel', app.translator.trans('clarkwinkelmann-money-rewards.forum.record.comment')),
+                m('span.MoneyRewardRecordCommentLabel', app.translator.trans('lowseekai-money-rewards.forum.record.comment')),
                 ' ',
                 m('span.MoneyRewardRecordCommentContent', reward.comment()),
             ]) : null,

@@ -1,6 +1,7 @@
-const config = require('flarum-webpack-config')();
+const config = require('flarum-webpack-config');
+const webpackConfig = config();
 
-config.externals.push(function ({context, request}, callback) {
+webpackConfig.externals.push(function ({context, request}, callback) {
     let matches;
     if ((matches = /^(flamarkt\/[^/]+)\/([^/]+)\/(.+)$/.exec(request))) {
         return callback(null, 'root ((flarum.extensions[\'' + matches[1].replace('/', '-') + '\']||{})[\'' + matches[2] + '\']||{})[\'' + matches[3] + '\']');
@@ -8,4 +9,4 @@ config.externals.push(function ({context, request}, callback) {
     callback();
 });
 
-module.exports = config;
+module.exports = webpackConfig;

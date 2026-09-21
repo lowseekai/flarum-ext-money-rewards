@@ -1,35 +1,34 @@
-clarkwinkelmann-money-rewards:
+lowseekai-money-rewards:
     admin:
         settings:
-            preselection: Pre-selected amounts (comma-separated, optional)
-            min: Minimum value for custom amounts
-            max: Maximum value for custom amounts
-            decimals: Maximum number of decimals for custom amounts
+            preselection: Pre-selected point amounts (comma-separated, optional)
+            min: Minimum points for custom amounts
+            max: Maximum points for custom amounts
         permissions:
-            seeMoneyRewardHistory: See history of other user's rewards
-            rewardWithMoney: Reward other users with money
-            customAmounts: Choose custom amounts for rewards
-            createMoney: Create new money in rewards
+            seeMoneyRewardHistory: See other users' point reward history
+            rewardWithMoney: Reward other users with points
+            customAmounts: Choose custom point amounts for rewards
+            createMoney: Create points in rewards
     forum:
         modal:
             title: Reward post
             target: 'Reward post #{number} by {username}'
-            optionCustom: Custom
+            optionCustom: Custom amount
             balance: 'Your balance: {amount}'
             label:
-                custom: Custom amount
-                create: Create money instead of subtracting my balance
+                custom: Custom point amount
+                create: Create points instead of subtracting from my balance
                 comment: Comment (public)
-            submit: Submit
-            success: The reward has been sent to the post author!
+            submit: Send reward
+            success: The point reward has been sent to the post author!
         profile:
-            nav: Rewards
-            title: Rewards
+            nav: Point rewards
+            title: Point rewards
         post:
-            action: Reward
+            action: Reward with points
             disallowedOwn: You cannot reward your own posts.
-            disallowedOther: You cannot reward this post. The most likely reasons are that the author is anonymous or deleted their account.
-            section: Rewards
+            disallowedOther: You cannot reward this post. The author may be anonymous or deleted.
+            section: Point rewards
         record:
             from: from
             to: to
@@ -37,5 +36,7 @@ clarkwinkelmann-money-rewards:
             comment: 'Comment:'
     api:
         error:
-            decimals: The amount is limited to {decimals} decimals.
-            notEnoughFunds: Not enough funds.
+            invalidAmount: The point amount is invalid.
+            notEnoughFunds: Not enough points.
+            invalidRecipient: This post cannot receive a reward.
+            systemDisabled: The point system is currently disabled.

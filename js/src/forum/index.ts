@@ -13,7 +13,7 @@ import RewardHistoryPage from './components/RewardHistoryPage';
 import RewardModal from './components/RewardModal';
 import PostRewards from './components/PostRewards';
 
-app.initializers.add('clarkwinkelmann-money-rewards', () => {
+app.initializers.add('lowseekai-money-rewards', () => {
     app.routes.userMoneyRewardHistory = {
         path: '/u/:username/rewards',
         component: RewardHistoryPage,
@@ -33,8 +33,8 @@ app.initializers.add('clarkwinkelmann-money-rewards', () => {
             href: app.route('userMoneyRewardHistory', {
                 username: this.user.slug(),
             }),
-            icon: 'fas fa-money-bill',
-        }, app.translator.trans('clarkwinkelmann-money-rewards.forum.profile.nav')));
+            icon: 'fas fa-coins',
+        }, app.translator.trans('lowseekai-money-rewards.forum.profile.nav')));
     });
 
     extend(PostControls, 'userControls', function (items, post: Post) {
@@ -44,9 +44,9 @@ app.initializers.add('clarkwinkelmann-money-rewards', () => {
                     icon: 'fas fa-gift',
                     className: 'disabled', // Setting just the class so you can still actually click the button
                     onclick: () => {
-                        alert(extractText(app.translator.trans('clarkwinkelmann-money-rewards.forum.post.disallowed' + (post.user() === app.session.user ? 'Own' : 'Other'))));
+                        alert(extractText(app.translator.trans('lowseekai-money-rewards.forum.post.disallowed' + (post.user() === app.session.user ? 'Own' : 'Other'))));
                     },
-                }, app.translator.trans('clarkwinkelmann-money-rewards.forum.post.action')));
+                }, app.translator.trans('lowseekai-money-rewards.forum.post.action')));
             }
 
             return;
@@ -59,7 +59,7 @@ app.initializers.add('clarkwinkelmann-money-rewards', () => {
                 });
             },
             icon: 'fas fa-gift',
-        }, app.translator.trans('clarkwinkelmann-money-rewards.forum.post.action')));
+        }, app.translator.trans('lowseekai-money-rewards.forum.post.action')));
     });
 
     extend(CommentPost.prototype, 'content', function (content) {

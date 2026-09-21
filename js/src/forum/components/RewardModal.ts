@@ -1,16 +1,16 @@
 import app from 'flarum/forum/app';
-import Modal, {IInternalModalAttrs} from 'flarum/common/components/Modal';
+import FormModal, {IFormModalAttrs} from 'flarum/common/components/FormModal';
 import Button from 'flarum/common/components/Button';
 import Switch from 'flarum/common/components/Switch';
 import {ApiPayloadSingle} from 'flarum/common/Store';
 import Post from 'flarum/common/models/Post';
 import FormattedMoney from './FormattedMoney';
 
-interface RewardModalAttrs extends IInternalModalAttrs {
+interface RewardModalAttrs extends IFormModalAttrs {
     post: Post
 }
 
-export default class RewardModal extends Modal<RewardModalAttrs> {
+export default class RewardModal extends FormModal<RewardModalAttrs> {
     preselectAmount: number = 0
     customAmount: boolean = false
     customAmountValue: string = ''
@@ -20,7 +20,7 @@ export default class RewardModal extends Modal<RewardModalAttrs> {
     oninit(vnode: any) {
         super.oninit(vnode);
 
-        if ((app.forum.attribute<string[]>('moneyRewardsPreselection') || []).length === 0) {
+        if ((app.forum.attribute<number[]>('moneyRewardsPreselection') || []).length === 0) {
             this.customAmount = true;
         }
     }
@@ -30,15 +30,15 @@ export default class RewardModal extends Modal<RewardModalAttrs> {
     }
 
     title() {
-        return app.translator.trans('clarkwinkelmann-money-rewards.forum.modal.title');
+        return app.translator.trans('lowseekai-money-rewards.forum.modal.title');
     }
 
     content() {
-        const preselection = app.forum.attribute<string[]>('moneyRewardsPreselection') || [];
+        const preselection = app.forum.attribute<number[]>('moneyRewardsPreselection') || [];
 
         return m('.Modal-body', [
             m('.Form-group', [
-                app.translator.trans('clarkwinkelmann-money-rewards.forum.modal.target', {
+                app.translator.trans('lowseekai-money-rewards.forum.modal.target', {
                     number: this.attrs.post.number(),
                     user: this.attrs.post.user(),
                 }),
@@ -57,7 +57,7 @@ export default class RewardModal extends Modal<RewardModalAttrs> {
                         }),
                         ' ',
                         FormattedMoney.component({
-                            money: amount,
+                            money: Number(amount),
                         }),
                     ]);
                 }),
@@ -71,11 +71,11 @@ export default class RewardModal extends Modal<RewardModalAttrs> {
                         },
                     }),
                     ' ',
-                    app.translator.trans('clarkwinkelmann-money-rewards.forum.modal.optionCustom'),
+                    app.translator.trans('lowseekai-money-rewards.forum.modal.optionCustom'),
                 ]) : null,
             ]) : null,
             this.customAmount ? m('.Form-group', [
-                m('label', app.translator.trans('clarkwinkelmann-money-rewards.forum.modal.label.custom')),
+                m('label', app.translator.trans('lowseekai-money-rewards.forum.modal.label.custom')),
                 m('input.FormControl', {
                     type: 'number',
                     value: this.customAmountValue,
@@ -84,13 +84,13 @@ export default class RewardModal extends Modal<RewardModalAttrs> {
                     },
                     min: app.forum.attribute('moneyRewardsCustomAmountsMin'),
                     max: app.forum.attribute('moneyRewardsCustomAmountsMax') || undefined,
-                    step: 1 / Math.pow(10, app.forum.attribute('moneyRewardsCustomAmountsDecimals')),
+                    step: 1,
                 }),
             ]) : '',
             m('.Form-group', [
-                app.translator.trans('clarkwinkelmann-money-rewards.forum.modal.balance', {
+                app.translator.trans('lowseekai-money-rewards.forum.modal.balance', {
                     amount: FormattedMoney.component({
-                        money: app.session.user!.attribute('money'),
+                        money: app.session.user!.attribute('pointBalance') || 0,
                     })
                 }),
             ]),
@@ -100,10 +100,10 @@ export default class RewardModal extends Modal<RewardModalAttrs> {
                     onchange: (value: boolean) => {
                         this.createMoney = value;
                     },
-                }, app.translator.trans('clarkwinkelmann-money-rewards.forum.modal.label.create')),
+                }, app.translator.trans('lowseekai-money-rewards.forum.modal.label.create')),
             ]) : null,
             m('.Form-group', [
-                m('label', app.translator.trans('clarkwinkelmann-money-rewards.forum.modal.label.comment')),
+                m('label', app.translator.trans('lowseekai-money-rewards.forum.modal.label.comment')),
                 m('textarea.FormControl', {
                     value: this.comment,
                     onchange: (event: InputEvent) => {
@@ -115,11 +115,11 @@ export default class RewardModal extends Modal<RewardModalAttrs> {
                 type: 'submit',
                 className: 'Button Button--primary',
                 loading: this.loading,
-            }, app.translator.trans('clarkwinkelmann-money-rewards.forum.modal.submit'))),
+            }, app.translator.trans('lowseekai-money-rewards.forum.modal.submit'))),
         ]);
     }
 
-    onsubmit(event: Event) {
+    onsubmit(event: SubmitEvent) {
         event.preventDefault();
 
         this.loading = true;
@@ -131,7 +131,7 @@ export default class RewardModal extends Modal<RewardModalAttrs> {
             body: {
                 data: {
                     attributes: {
-                        amount: this.customAmount ? this.customAmountValue : app.forum.attribute<string[]>('moneyRewardsPreselection')[this.preselectAmount],
+                        amount: this.customAmount ? this.customAmountValue : app.forum.attribute<number[]>('moneyRewardsPreselection')[this.preselectAmount],
                         createMoney: this.createMoney,
                         comment: this.comment,
                     },
@@ -143,7 +143,7 @@ export default class RewardModal extends Modal<RewardModalAttrs> {
 
                 this.hide();
 
-                app.alerts.show({type: 'success'}, app.translator.trans('clarkwinkelmann-money-rewards.forum.modal.success'));
+                app.alerts.show({type: 'success'}, app.translator.trans('lowseekai-money-rewards.forum.modal.success'));
             })
             .catch(() => {
                 this.loading = false;

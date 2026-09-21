@@ -10,7 +10,7 @@ return [
             $table->unsignedInteger('post_id')->nullable();
             $table->unsignedInteger('giver_user_id')->nullable();
             $table->unsignedInteger('receiver_user_id')->nullable();
-            $table->float('amount');
+            $table->unsignedInteger('amount');
             $table->boolean('new_money')->default(false);
             $table->text('comment');
             $table->timestamps();
