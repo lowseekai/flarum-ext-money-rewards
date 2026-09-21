@@ -5,6 +5,10 @@ use Illuminate\Database\Schema\Builder;
 
 return [
     'up' => function (Builder $schema) {
+        if ($schema->hasTable('money_rewards')) {
+            return;
+        }
+
         $schema->create('money_rewards', function (Blueprint $table) {
             $table->increments('id');
             $table->unsignedInteger('post_id')->nullable();
