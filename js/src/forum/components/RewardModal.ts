@@ -37,7 +37,7 @@ export default class RewardModal extends FormModal<RewardModalAttrs> {
         const preselection = app.forum.attribute<number[]>('moneyRewardsPreselection') || [];
 
         return m('.Modal-body', [
-            m('.Form-group', [
+            m('.Form-group.MoneyRewardTarget', [
                 app.translator.trans('lowseekai-money-rewards.forum.modal.target', {
                     number: this.attrs.post.number(),
                     user: this.attrs.post.user(),
@@ -111,7 +111,7 @@ export default class RewardModal extends FormModal<RewardModalAttrs> {
                     },
                 }),
             ]),
-            m('.Form-group', Button.component({
+            m('.Form-group.MoneyRewardSubmit', Button.component({
                 type: 'submit',
                 className: 'Button Button--primary',
                 loading: this.loading,
